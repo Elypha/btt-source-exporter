@@ -6,12 +6,17 @@ use ironworks::{
     excel::Excel,
     sqpack::{Install, SqPack},
 };
+mod btt_dialogue;
 mod exd_schema;
 mod export;
 mod formatter;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
+
+    if args.iter().any(|arg| arg == "--btt-dialogue") {
+        return btt_dialogue::export(btt_dialogue::Options::parse(&args)?);
+    }
 
     if args.len() < 2 {
         panic!(
