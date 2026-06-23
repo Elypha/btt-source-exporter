@@ -38,13 +38,13 @@ Supported codes are:
 
 International Japanese, English, German, and French come from the international client. Simplified Chinese, Traditional Chinese, and Korean are three separate regional clients and must be exported from their own client installs. Every client uses the same CLI path rule: pass the install root that contains the `game` folder.
 
-Run the exporter with one client install root, an output directory, and the client languages to export from that client:
+Run the exporter with one client install root and the client languages to export from that client:
 
 ```powershell
-cargo run -- "<install-root-containing-game>" --btt-dialogue --output output-btt-source --languages ja,en
+cargo run -- "<install-root-containing-game>" --languages ja,en
 ```
 
-Then, each selected language will write one archive:
+The default output root is `output`. Pass `--output <path>` only when you need to write somewhere else. Each selected language will write one archive:
 
 ```text
 <language>.bttsrc.tar.zst
@@ -57,7 +57,7 @@ The output root also contains `diagnostics.json`. Please keep the source archive
 To export only specific sheets for investigation, pass `--sheets`:
 
 ```powershell
-cargo run -- "<install-root-containing-game>" --btt-dialogue --output output-btt-source --languages ja --sheets DefaultTalk
+cargo run -- "<install-root-containing-game>" --languages ja --sheets DefaultTalk
 ```
 
 Explicit-sheet output is only for local investigation. Release-quality source sets should use the default scope, which is selected by omitting `--sheets`.

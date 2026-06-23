@@ -38,19 +38,16 @@ pub struct Options {
 impl Options {
     pub fn parse(args: &[String]) -> Result<Self, Box<dyn Error>> {
         if args.len() < 2 {
-            return Err("BTT dialogue export requires a game path before --btt-dialogue.".into());
+            return Err("BTT dialogue export requires a game path.".into());
         }
 
-        let mut output = String::from("output-btt-source");
+        let mut output = String::from("output");
         let mut languages = None;
         let mut sheets = None;
         let mut index = 2;
 
         while index < args.len() {
             match args[index].as_str() {
-                "--btt-dialogue" => {
-                    index += 1;
-                }
                 "--output" => {
                     output = required_value(args, index, "--output")?.to_string();
                     index += 2;
@@ -63,7 +60,7 @@ impl Options {
                     sheets = Some(split_csv_arg(required_value(args, index, "--sheets")?));
                     index += 2;
                 }
-                other => return Err(format!("Unknown --btt-dialogue option: {other}").into()),
+                other => return Err(format!("Unknown option: {other}").into()),
             }
         }
 
