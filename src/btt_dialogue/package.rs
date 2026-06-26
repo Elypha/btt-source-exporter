@@ -4,16 +4,14 @@ use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use tar::{Builder, Header};
 use zstd::stream::Encoder;
 
 use super::binary::checked_u64;
 use super::contract::{
-    AST_ENCODING_VERSION, DIAGNOSTICS_FILE, DIALOGUE_FILE_PATH, DIALOGUE_FILE_ROLE,
-    DIALOGUE_SCHEMA_VERSION, MANIFEST_FILE, SOURCE_BUNDLE_FORMAT, SOURCE_BUNDLE_FORMAT_VERSION,
-    SOURCE_BUNDLE_KIND, STRUCTURE_FILE_PATH, STRUCTURE_FILE_ROLE, STRUCTURE_SCHEMA_VERSION,
-    ScopeMode,
+    AST_ENCODING_VERSION, DIAGNOSTICS_FILE, DIALOGUE_FILE_PATH, DIALOGUE_SCHEMA_VERSION,
+    MANIFEST_FILE, SOURCE_BUNDLE_FORMAT, SOURCE_BUNDLE_FORMAT_VERSION, SOURCE_BUNDLE_KIND,
+    STRUCTURE_FILE_PATH, STRUCTURE_SCHEMA_VERSION, ScopeMode,
 };
 use super::language;
 use super::shards::SourceBundleBuilder;
@@ -23,9 +21,6 @@ pub(super) struct BundleSummary {
     pub(super) structure_records: usize,
     pub(super) empty_text_records: usize,
     pub(super) skipped_empty_keys: usize,
-    pub(super) bundle_path: String,
-    pub(super) bundle_bytes: u64,
-    pub(super) bundle_sha256: String,
 }
 
 pub(super) fn write_source_bundle(
@@ -43,25 +38,6 @@ pub(super) fn write_source_bundle(
 
     let structure_bytes = bundle.structure_bytes()?;
     let dialogue_bytes = bundle.dialogue_bytes()?;
-    let structure_hash = sha256_bytes(&structure_bytes);
-    let dialogue_hash = sha256_bytes(&dialogue_bytes);
-
-    let files = vec![
-        SourceBundleFile {
-            role: STRUCTURE_FILE_ROLE,
-            path: STRUCTURE_FILE_PATH,
-            bytes: checked_u64(structure_bytes.len(), "structure shard byte length")?,
-            sha256: structure_hash,
-            record_count: structure_records,
-        },
-        SourceBundleFile {
-            role: DIALOGUE_FILE_ROLE,
-            path: DIALOGUE_FILE_PATH,
-            bytes: checked_u64(dialogue_bytes.len(), "dialogue shard byte length")?,
-            sha256: dialogue_hash,
-            record_count: dialogue_records,
-        },
-    ];
 
     let manifest = SourceBundleManifest {
         format: SOURCE_BUNDLE_FORMAT,
@@ -80,7 +56,6 @@ pub(super) fn write_source_bundle(
         dialogue_records,
         empty_text_records,
         skipped_empty_keys,
-        files,
     };
     let mut manifest_bytes = serde_json::to_vec_pretty(&manifest)?;
     manifest_bytes.push(b'\n');
@@ -95,17 +70,11 @@ pub(super) fn write_source_bundle(
         ],
     )?;
 
-    let bundle_bytes = fs::metadata(&archive_path)?.len();
-    let bundle_sha256 = sha256_file(&archive_path)?;
-
     Ok(BundleSummary {
         dialogue_records,
         structure_records,
         empty_text_records,
         skipped_empty_keys,
-        bundle_path: archive_path.to_string_lossy().replace('\\', "/"),
-        bundle_bytes,
-        bundle_sha256,
     })
 }
 
@@ -139,17 +108,6 @@ struct SourceBundleManifest<'a> {
     empty_text_records: usize,
     #[serde(rename = "skippedEmptyKeys")]
     skipped_empty_keys: usize,
-    files: Vec<SourceBundleFile>,
-}
-
-#[derive(Serialize)]
-struct SourceBundleFile {
-    role: &'static str,
-    path: &'static str,
-    bytes: u64,
-    sha256: String,
-    #[serde(rename = "recordCount")]
-    record_count: usize,
 }
 
 pub(super) fn write_root_diagnostics(
@@ -201,9 +159,6 @@ pub(super) fn bundle_diagnostic(
         structure_records: summary.structure_records,
         empty_text_records: summary.empty_text_records,
         skipped_empty_keys: summary.skipped_empty_keys,
-        bundle: summary.bundle_path.clone(),
-        bundle_bytes: summary.bundle_bytes,
-        bundle_sha256: summary.bundle_sha256.clone(),
         errors: Vec::new(),
     }
 }
@@ -227,11 +182,6 @@ pub(super) struct SourceBundleDiagnostic {
     empty_text_records: usize,
     #[serde(rename = "skippedEmptyKeys")]
     skipped_empty_keys: usize,
-    bundle: String,
-    #[serde(rename = "bundleBytes")]
-    bundle_bytes: u64,
-    #[serde(rename = "bundleSha256")]
-    bundle_sha256: String,
     errors: Vec<String>,
 }
 
@@ -283,25 +233,4 @@ fn append_tar_file<W: Write>(
     header.set_cksum();
     tar.append_data(&mut header, name, Cursor::new(data))?;
     Ok(())
-}
-
-fn sha256_bytes(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    hex_lower(&hasher.finalize())
-}
-
-fn sha256_file(path: &Path) -> Result<String, Box<dyn Error>> {
-    let bytes = fs::read(path)?;
-    Ok(sha256_bytes(&bytes))
-}
-
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut output = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        output.push(HEX[(byte >> 4) as usize] as char);
-        output.push(HEX[(byte & 0x0f) as usize] as char);
-    }
-    output
 }

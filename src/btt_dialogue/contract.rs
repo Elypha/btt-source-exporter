@@ -17,9 +17,7 @@ pub(super) const AST_ENCODING_VERSION: u32 = 1;
 
 pub(super) const MANIFEST_FILE: &str = "manifest.json";
 pub(super) const DIAGNOSTICS_FILE: &str = "diagnostics.json";
-pub(super) const STRUCTURE_FILE_ROLE: &str = "structure";
 pub(super) const STRUCTURE_FILE_PATH: &str = "structure.bttbin";
-pub(super) const DIALOGUE_FILE_ROLE: &str = "dialogue";
 pub(super) const DIALOGUE_FILE_PATH: &str = "dialogue.bttbin";
 
 pub(super) const STRUCTURE_MAGIC: &[u8; 16] = b"BTT-SRC-STRUCT\0\0";
