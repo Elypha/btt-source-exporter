@@ -1,14 +1,6 @@
 # btt-source-exporter
 
-This tool exports client-derived dialogue source bundles for the [BilingualTooltips](https://github.com/Elypha/BilingualTooltips) Dalamud plugin.
-
-It reads a local Final Fantasy XIV client through [ironworks](https://github.com/ackwell/ironworks) and [EXDSchema](https://github.com/xivdev/EXDSchema). It does not build the final plugin database. It only produces per-language source bundles that the BilingualTooltips package builder can merge later.
-
-## Requirements
-
-- Rust 1.87 or newer
-- A local Final Fantasy XIV client for the language you want to export. The path passed to the tool must be the client install root that contains the `game` folder.
-- This repository cloned with submodules
+Exports dialogue source bundles for [BilingualTooltips](https://github.com/Elypha/BilingualTooltips).
 
 ## Setup
 
@@ -16,48 +8,55 @@ It reads a local Final Fantasy XIV client through [ironworks](https://github.com
 git clone --recurse-submodules https://github.com/Elypha/btt-source-exporter
 cd btt-source-exporter
 cargo check
+Push-Location builder
+npm install
+Pop-Location
 ```
 
-If schemas need to be refreshed:
+To refresh schemas:
 
 ```powershell
 git submodule update --remote
 ```
 
-## Export Dialogue Source Bundles
+## Export
 
-Supported codes are:
+### (1/2) Export Dialogue Source Bundles
 
-- `ja`
-- `en`
-- `de`
-- `fr`
-- `zh-Hans`
-- `zh-Hant`
-- `ko`
-
-International Japanese, English, German, and French come from the international client. Simplified Chinese, Traditional Chinese, and Korean are three separate regional clients and must be exported from their own client installs. Every client uses the same CLI path rule: pass the install root that contains the `game` folder.
-
-Run the exporter with one client install root and the client languages to export from that client:
-
-```powershell
-cargo run -- "<install-root-containing-game>" --languages ja,en
-```
-
-The default output root is `output`. Pass `--output <path>` only when you need to write somewhere else. Each selected language will write one archive:
+Supported languages:
 
 ```text
-<language>.bttsrc.tar.zst
+ja,en,de,fr,zh-Hans,zh-Hant,ko
 ```
 
-The output root also contains `diagnostics.json`. Please keep the source archives and diagnostics together when sharing an export for review.
+Pass the client install root that contains the `game` folder. By default, files are written to `output`. Use `--output <path>` to change it.
 
-## Export Individual Sheets
+```powershell
+cargo run -- "<install-root-containing-game>" --languages ja,en --output "another_output"
+```
 
-To export only specific sheets for investigation, pass `--sheets`:
+Each language produces a `<language>.bttsrc.tar.zst`, and `diagnostics.json` is also written (append) to the output folder. Keep it with the archives when sharing exports. Example output:
+
+```
+output/
+    ja.bttsrc.tar.zst
+    en.bttsrc.tar.zst
+    ...
+    diagnostics.json
+```
+
+### (2/2) Build Dialogue Package
+
+```powershell
+npm --prefix builder run build -- --source-root output --output dist --build-number 1 --game-version "2026.06.18.0000.0000"
+```
+
+See `builder/REVIEW.md` for the external-review reading map.
+
+## Development
+
+**Export Individual Sheets:** For investigation only. Omit `--sheets` for release-quality exports.
 
 ```powershell
 cargo run -- "<install-root-containing-game>" --languages ja --sheets DefaultTalk
 ```
-
-Explicit-sheet output is only for local investigation. Release-quality source sets should use the default scope, which is selected by omitting `--sheets`.
