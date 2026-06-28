@@ -6,6 +6,8 @@ use ironworks::{
     file::{File, exh::ExcelHeader},
 };
 
+// BTT language table
+// --------------------------------
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct BttLanguage {
     code: &'static str,
@@ -72,13 +74,41 @@ pub(super) fn from_code(code: &str) -> Option<BttLanguage> {
         .find(|language| language.code == code)
 }
 
-pub(super) fn canonical_index(code: &str) -> usize {
-    ALL_LANGUAGES
-        .iter()
-        .position(|language| language.code == code)
-        .unwrap_or(usize::MAX)
+// export language selection
+// --------------------------------
+pub(super) fn select_export_languages(
+    ironworks: &Ironworks,
+    requested: Option<&[String]>,
+) -> Result<Vec<BttLanguage>, Box<dyn Error>> {
+    let available = available_languages(ironworks)?;
+    if let Some(requested) = requested {
+        let mut selected = Vec::new();
+        for code in requested {
+            let code = code.as_str();
+            if selected
+                .iter()
+                .any(|language: &BttLanguage| language.code() == code)
+            {
+                return Err(format!("Duplicate language code: {code}").into());
+            }
+
+            let language = from_code(code)
+                .ok_or_else(|| format!("Unsupported BTT dialogue language code: {code}"))?;
+            if !available.contains(&language) {
+                return Err(format!("Language is not available in this client: {code}").into());
+            }
+
+            selected.push(language);
+        }
+
+        return Ok(selected);
+    }
+
+    Ok(available)
 }
 
+// client availability probe
+// --------------------------------
 pub(super) fn available_languages(
     ironworks: &Ironworks,
 ) -> Result<Vec<BttLanguage>, Box<dyn Error>> {

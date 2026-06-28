@@ -35,7 +35,7 @@ impl Write for MarkdownWriter {
         Ok(())
     }
 
-    // Just replace all of the color shenanigans with bold markdown
+    // Use bold markdown for all foreground and background colour style handling.
     fn push_color(&mut self, usage: ColorUsage, _color: Color) -> Result<(), SeStringError> {
         if usage == ColorUsage::Foreground {
             self.buffer.push_str("**");

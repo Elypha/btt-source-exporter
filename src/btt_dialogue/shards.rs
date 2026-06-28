@@ -2,7 +2,6 @@ use std::error::Error;
 
 use ironworks::sestring::SeString;
 
-use super::ast::encode_sestring;
 use super::binary::{
     StringPool, align8, checked_u16, checked_u32, checked_u64, pad_to, write_u16, write_u32,
     write_u64,
@@ -10,6 +9,27 @@ use super::binary::{
 use super::contract::{
     DIALOGUE_MAGIC, DIALOGUE_SCHEMA_VERSION, STRUCTURE_MAGIC, STRUCTURE_SCHEMA_VERSION,
 };
+use super::dialogue_ir::encode_dialogue_ir;
+
+// source bundle facade
+// --------------------------------
+#[derive(Clone, Copy)]
+pub(super) struct SourceRecordIdentityRef<'a> {
+    pub(super) sheet: &'a str,
+    pub(super) row: &'a str,
+    pub(super) column: &'a str,
+    pub(super) key: &'a str,
+}
+
+pub(super) struct StructureRecordRef<'a> {
+    pub(super) identity: SourceRecordIdentityRef<'a>,
+    pub(super) has_text: bool,
+}
+
+pub(super) struct DialogueRecordRef<'a> {
+    pub(super) identity: SourceRecordIdentityRef<'a>,
+    pub(super) value: SeString<'a>,
+}
 
 pub(super) struct SourceBundleBuilder {
     structure: StructureShardBuilder,
@@ -73,22 +93,14 @@ impl SourceBundleBuilder {
     }
 }
 
-#[derive(Clone, Copy)]
-pub(super) struct SourceRecordIdentityRef<'a> {
-    pub(super) sheet: &'a str,
-    pub(super) row: &'a str,
-    pub(super) column: &'a str,
-    pub(super) key: &'a str,
-}
-
-pub(super) struct StructureRecordRef<'a> {
-    pub(super) identity: SourceRecordIdentityRef<'a>,
-    pub(super) has_text: bool,
-}
-
-pub(super) struct DialogueRecordRef<'a> {
-    pub(super) identity: SourceRecordIdentityRef<'a>,
-    pub(super) value: SeString<'a>,
+// structure shard
+// --------------------------------
+struct StructureRow {
+    key: u32,
+    sheet: u32,
+    row: u32,
+    column: u32,
+    flags: u32,
 }
 
 #[derive(Default)]
@@ -168,12 +180,14 @@ impl StructureShardBuilder {
     }
 }
 
-struct StructureRow {
+// dialogue shard
+// --------------------------------
+struct DialogueRow {
     key: u32,
     sheet: u32,
     row: u32,
     column: u32,
-    flags: u32,
+    ir: Vec<u8>,
 }
 
 #[derive(Default)]
@@ -184,14 +198,14 @@ struct DialogueShardBuilder {
 
 impl DialogueShardBuilder {
     fn push(&mut self, record: DialogueRecordRef<'_>) -> Result<(), Box<dyn Error>> {
-        let mut ast = Vec::new();
-        encode_sestring(record.value, &mut ast, &mut self.pool)?;
+        let mut ir = Vec::new();
+        encode_dialogue_ir(&record.value, &mut ir, &mut self.pool)?;
         self.rows.push(DialogueRow {
             key: self.pool.add(record.identity.key)?,
             sheet: self.pool.add(record.identity.sheet)?,
             row: self.pool.add(record.identity.row)?,
             column: self.pool.add(record.identity.column)?,
-            ast,
+            ir,
         });
         Ok(())
     }
@@ -200,25 +214,25 @@ impl DialogueShardBuilder {
         let row_size = 16usize;
         let header_size = 88usize;
         let rows_offset = header_size;
-        let ast_offsets_offset = rows_offset + self.rows.len() * row_size;
-        let ast_bytes_offset = ast_offsets_offset + (self.rows.len() + 1) * 8;
+        let ir_offsets_offset = rows_offset + self.rows.len() * row_size;
+        let ir_bytes_offset = ir_offsets_offset + (self.rows.len() + 1) * 8;
 
-        let mut ast_offsets = Vec::with_capacity((self.rows.len() + 1) * 8);
-        let mut ast_bytes = Vec::new();
+        let mut ir_offsets = Vec::with_capacity((self.rows.len() + 1) * 8);
+        let mut ir_bytes = Vec::new();
         for row in &self.rows {
             write_u64(
-                &mut ast_offsets,
-                checked_u64(ast_bytes.len(), "dialogue AST byte offset")?,
+                &mut ir_offsets,
+                checked_u64(ir_bytes.len(), "dialogue IR byte offset")?,
             );
-            ast_bytes.extend_from_slice(&row.ast);
+            ir_bytes.extend_from_slice(&row.ir);
         }
         write_u64(
-            &mut ast_offsets,
-            checked_u64(ast_bytes.len(), "dialogue AST byte length")?,
+            &mut ir_offsets,
+            checked_u64(ir_bytes.len(), "dialogue IR byte length")?,
         );
 
         let (string_offsets, string_bytes) = self.pool.to_buffers();
-        let string_offsets_offset = align8(ast_bytes_offset + ast_bytes.len());
+        let string_offsets_offset = align8(ir_bytes_offset + ir_bytes.len());
         let string_bytes_offset = string_offsets_offset + string_offsets.len();
 
         let mut output = Vec::with_capacity(string_bytes_offset + string_bytes.len());
@@ -245,11 +259,11 @@ impl DialogueShardBuilder {
         );
         write_u64(
             &mut output,
-            checked_u64(ast_offsets_offset, "dialogue AST offsets offset")?,
+            checked_u64(ir_offsets_offset, "dialogue IR offsets offset")?,
         );
         write_u64(
             &mut output,
-            checked_u64(ast_bytes_offset, "dialogue AST bytes offset")?,
+            checked_u64(ir_bytes_offset, "dialogue IR bytes offset")?,
         );
         write_u64(
             &mut output,
@@ -271,19 +285,11 @@ impl DialogueShardBuilder {
             write_u32(&mut output, row.column);
         }
 
-        output.extend_from_slice(&ast_offsets);
-        output.extend_from_slice(&ast_bytes);
+        output.extend_from_slice(&ir_offsets);
+        output.extend_from_slice(&ir_bytes);
         pad_to(&mut output, string_offsets_offset);
         output.extend_from_slice(&string_offsets);
         output.extend_from_slice(&string_bytes);
         Ok(output)
     }
-}
-
-struct DialogueRow {
-    key: u32,
-    sheet: u32,
-    row: u32,
-    column: u32,
-    ast: Vec<u8>,
 }

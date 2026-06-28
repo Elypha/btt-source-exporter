@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::error::Error;
 
+// string pool
+// --------------------------------
 #[derive(Default)]
 pub(super) struct StringPool {
     ids: HashMap<String, u32>,
@@ -36,6 +38,8 @@ impl StringPool {
     }
 }
 
+// layout helpers
+// --------------------------------
 pub(super) fn align8(value: usize) -> usize {
     (value + 7) & !7
 }
@@ -58,6 +62,8 @@ pub(super) fn checked_u64(value: usize, name: &str) -> Result<u64, Box<dyn Error
     u64::try_from(value).map_err(|_| format!("{name} exceeds u64 range: {value}").into())
 }
 
+// little-endian writers
+// --------------------------------
 pub(super) fn write_u8(output: &mut Vec<u8>, value: u8) {
     output.push(value);
 }

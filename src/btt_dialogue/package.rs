@@ -9,13 +9,14 @@ use zstd::stream::Encoder;
 
 use super::binary::checked_u64;
 use super::contract::{
-    AST_ENCODING_VERSION, DIAGNOSTICS_FILE, DIALOGUE_FILE_PATH, DIALOGUE_SCHEMA_VERSION,
-    MANIFEST_FILE, SOURCE_BUNDLE_FORMAT, SOURCE_BUNDLE_FORMAT_VERSION, SOURCE_BUNDLE_KIND,
-    STRUCTURE_FILE_PATH, STRUCTURE_SCHEMA_VERSION, ScopeMode,
+    DIALOGUE_FILE_PATH, DIALOGUE_IR_ENCODING_VERSION, DIALOGUE_SCHEMA_VERSION, MANIFEST_FILE,
+    SOURCE_BUNDLE_FORMAT, SOURCE_BUNDLE_FORMAT_VERSION, SOURCE_BUNDLE_KIND, STRUCTURE_FILE_PATH,
+    STRUCTURE_SCHEMA_VERSION, ScopeMode,
 };
-use super::language;
 use super::shards::SourceBundleBuilder;
 
+// source bundle archive
+// --------------------------------
 pub(super) struct BundleSummary {
     pub(super) dialogue_records: usize,
     pub(super) structure_records: usize,
@@ -47,7 +48,7 @@ pub(super) fn write_source_bundle(
         game_version,
         structure_schema_version: u32::from(STRUCTURE_SCHEMA_VERSION),
         dialogue_schema_version: u32::from(DIALOGUE_SCHEMA_VERSION),
-        ast_encoding_version: AST_ENCODING_VERSION,
+        dialogue_ir_encoding_version: DIALOGUE_IR_ENCODING_VERSION,
         scope_mode: scope_mode.as_str(),
         source_scopes: scope_mode.source_scope_names(),
         sheets: sheets.to_vec(),
@@ -91,8 +92,8 @@ struct SourceBundleManifest<'a> {
     structure_schema_version: u32,
     #[serde(rename = "dialogueSchemaVersion")]
     dialogue_schema_version: u32,
-    #[serde(rename = "astEncodingVersion")]
-    ast_encoding_version: u32,
+    #[serde(rename = "dialogueIrEncodingVersion")]
+    dialogue_ir_encoding_version: u32,
     #[serde(rename = "scopeMode")]
     scope_mode: &'a str,
     #[serde(rename = "sourceScopes")]
@@ -110,35 +111,53 @@ struct SourceBundleManifest<'a> {
     skipped_empty_keys: usize,
 }
 
-pub(super) fn write_root_diagnostics(
+// export-run diagnostics
+// --------------------------------
+#[derive(Deserialize, Serialize)]
+pub(super) struct SourceBundleDiagnostic {
+    language: String,
+    format: String,
+    #[serde(rename = "formatVersion")]
+    format_version: u32,
+    #[serde(rename = "gameVersion")]
+    game_version: String,
+    #[serde(rename = "scopeMode")]
+    scope_mode: String,
+    #[serde(rename = "sheetCount")]
+    sheet_count: usize,
+    records: usize,
+    #[serde(rename = "structureRecords")]
+    structure_records: usize,
+    #[serde(rename = "emptyTextRecords")]
+    empty_text_records: usize,
+    #[serde(rename = "skippedEmptyKeys")]
+    skipped_empty_keys: usize,
+    errors: Vec<String>,
+}
+
+pub(super) fn write_run_diagnostics(
     output_dir: &Path,
     diagnostics: Vec<SourceBundleDiagnostic>,
 ) -> Result<(), Box<dyn Error>> {
-    let diagnostics_path = output_dir.join(DIAGNOSTICS_FILE);
-    // Different regional clients can be exported into the same source root, so
-    // update only the languages produced by this run.
-    let mut merged_diagnostics = if diagnostics_path.exists() {
-        let existing = fs::read_to_string(&diagnostics_path)?;
-        serde_json::from_str::<Vec<SourceBundleDiagnostic>>(&existing)?
-    } else {
-        Vec::new()
-    };
-
-    for diagnostic in diagnostics {
-        let language = diagnostic.language.clone();
-        merged_diagnostics.retain(|entry| entry.language != language);
-        merged_diagnostics.push(diagnostic);
-    }
-
-    merged_diagnostics.sort_by(|left, right| {
-        language::canonical_index(&left.language).cmp(&language::canonical_index(&right.language))
-    });
+    let diagnostics_path = output_dir.join(diagnostics_file_name(&diagnostics)?);
     fs::write(
         diagnostics_path,
-        format!("{}\n", serde_json::to_string_pretty(&merged_diagnostics)?),
+        format!("{}\n", serde_json::to_string_pretty(&diagnostics)?),
     )?;
 
     Ok(())
+}
+
+fn diagnostics_file_name(diagnostics: &[SourceBundleDiagnostic]) -> Result<String, Box<dyn Error>> {
+    let languages = diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.language.as_str())
+        .collect::<Vec<_>>();
+    if languages.is_empty() {
+        return Err("No languages were exported; diagnostics file name would be empty.".into());
+    }
+
+    Ok(format!("{}.diagnostics.json", languages.join(",")))
 }
 
 pub(super) fn bundle_diagnostic(
@@ -163,28 +182,8 @@ pub(super) fn bundle_diagnostic(
     }
 }
 
-#[derive(Deserialize, Serialize)]
-pub(super) struct SourceBundleDiagnostic {
-    language: String,
-    format: String,
-    #[serde(rename = "formatVersion")]
-    format_version: u32,
-    #[serde(rename = "gameVersion")]
-    game_version: String,
-    #[serde(rename = "scopeMode")]
-    scope_mode: String,
-    #[serde(rename = "sheetCount")]
-    sheet_count: usize,
-    records: usize,
-    #[serde(rename = "structureRecords")]
-    structure_records: usize,
-    #[serde(rename = "emptyTextRecords")]
-    empty_text_records: usize,
-    #[serde(rename = "skippedEmptyKeys")]
-    skipped_empty_keys: usize,
-    errors: Vec<String>,
-}
-
+// client install metadata
+// --------------------------------
 pub(super) fn read_game_version(game_path: &Path) -> Option<String> {
     fs::read_to_string(game_path.join("game/ffxivgame.ver"))
         .ok()
@@ -205,6 +204,8 @@ pub(super) fn require_game_install_root(game_path: &str) -> Result<PathBuf, Box<
     .into())
 }
 
+// deterministic tar.zst writer
+// --------------------------------
 fn write_tar_zstd(path: &Path, files: &[(&str, &[u8])]) -> Result<(), Box<dyn Error>> {
     let file = File::create(path)?;
     let encoder = Encoder::new(file, 10)?;

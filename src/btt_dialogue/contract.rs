@@ -1,3 +1,5 @@
+// source scope defaults
+// --------------------------------
 pub(super) const DEFAULT_TALK_SHEET: &str = "DefaultTalk";
 pub(super) const DEFAULT_TALK_TEXT_COLUMNS: [&str; 3] = ["Text[0]", "Text[1]", "Text[2]"];
 
@@ -8,31 +10,33 @@ pub(super) const DEFAULT_SOURCE_SCOPES: [SourceScope; 4] = [
     SourceScope::Folder("cut_scene"),
 ];
 
+// source bundle manifest
+// --------------------------------
 pub(super) const SOURCE_BUNDLE_FORMAT: &str = "btt-dialogue-source-bundle";
 pub(super) const SOURCE_BUNDLE_FORMAT_VERSION: u32 = 1;
 pub(super) const SOURCE_BUNDLE_KIND: &str = "dialogue-source";
 pub(super) const STRUCTURE_SCHEMA_VERSION: u16 = 1;
 pub(super) const DIALOGUE_SCHEMA_VERSION: u16 = 1;
-pub(super) const AST_ENCODING_VERSION: u32 = 1;
+pub(super) const DIALOGUE_IR_ENCODING_VERSION: u32 = 2;
 
 pub(super) const MANIFEST_FILE: &str = "manifest.json";
-pub(super) const DIAGNOSTICS_FILE: &str = "diagnostics.json";
 pub(super) const STRUCTURE_FILE_PATH: &str = "structure.bttbin";
 pub(super) const DIALOGUE_FILE_PATH: &str = "dialogue.bttbin";
 
+// source shard magic
+// --------------------------------
 pub(super) const STRUCTURE_MAGIC: &[u8; 16] = b"BTT-SRC-STRUCT\0\0";
 pub(super) const DIALOGUE_MAGIC: &[u8; 16] = b"BTT-SRC-DIALOGUE";
 
-pub(super) const AST_SESTRING: u8 = 1;
-pub(super) const AST_TEXT: u8 = 2;
-pub(super) const AST_MACRO: u8 = 3;
-pub(super) const AST_U32: u8 = 4;
-pub(super) const AST_TIME_PART: u8 = 5;
-pub(super) const AST_STACK_COLOR: u8 = 6;
-pub(super) const AST_UNARY: u8 = 7;
-pub(super) const AST_BINARY: u8 = 8;
-pub(super) const AST_UNKNOWN_EXPRESSION: u8 = 9;
-pub(super) const AST_UNHANDLED_EXPRESSION: u8 = 10;
+// dialogue IR node tags
+// --------------------------------
+pub(super) const IR_SEQUENCE: u8 = 1;
+pub(super) const IR_TEXT: u8 = 2;
+pub(super) const IR_PLACEHOLDER: u8 = 3;
+pub(super) const IR_PARAMETER: u8 = 4;
+pub(super) const IR_PLAYER_NAME: u8 = 5;
+pub(super) const IR_IF: u8 = 6;
+pub(super) const IR_SWITCH: u8 = 7;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum SourceScope {
