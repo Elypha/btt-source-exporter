@@ -8,9 +8,8 @@ Exports dialogue source bundles for [BilingualTooltips](https://github.com/Elyph
 git clone --recurse-submodules https://github.com/Elypha/btt-source-exporter
 cd btt-source-exporter
 cargo check
-Push-Location builder
+cd builder
 npm install
-Pop-Location
 ```
 
 To refresh schemas:
@@ -20,6 +19,8 @@ git submodule update --remote
 ```
 
 ## Export
+
+Output folders are not cleaned automatically and generated files with the same name are overwritten.
 
 ### (1/2) Export Dialogue Source Bundles
 
@@ -35,23 +36,25 @@ Pass the client install root that contains the `game` folder. By default, files 
 cargo run -- "<install-root-containing-game>" --languages ja,en --output "another_output"
 ```
 
-Each language produces a `<language>.bttsrc.tar.zst`, and `diagnostics.json` is also written (append) to the output folder. Keep it with the archives when sharing exports. Example output:
+Each language produces a `<language>.bttsrc.tar.zst`. The exporter also writes one `<languages>.diagnostics.json` file for the current run. Keep it with the archives when sharing exports. Example output:
 
 ```
 output/
     ja.bttsrc.tar.zst
     en.bttsrc.tar.zst
     ...
-    diagnostics.json
+    ja,en.diagnostics.json
 ```
 
 ### (2/2) Build Dialogue Package
 
 ```powershell
-npm --prefix builder run build -- --source-root output --output dist --build-number 1 --game-version "2026.06.18.0000.0000"
+npm --prefix builder run build -- `
+    --build-number 1 `
+    --game-version "2026.06.18.0000.0000" `
+    --source-root "../output" `
+    --output "../dist"
 ```
-
-See `builder/REVIEW.md` for the external-review reading map.
 
 ## Development
 
