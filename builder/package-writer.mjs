@@ -175,9 +175,10 @@ function buildTemplateShard(records, definition) {
 // --------------------------------
 function buildMatchShard(records, definition) {
   const exactMap = new Map();
-  const patterns = [];
   const candidateCache = new Map();
   const property = definition.property;
+  let patterns = [];
+  let patternOrder = 0;
 
   for (const entry of records) {
     const source = entry[property] ?? null;
@@ -206,10 +207,33 @@ function buildMatchShard(records, definition) {
         patterns.push({
           entryId: entry.entryId,
           tokens: candidate.tokens,
+          order: patternOrder++,
         });
       }
     }
   }
+
+  const scoredPatterns = patterns.map(pattern => {
+    let totalLength = 0;
+    let longestTokenLength = 0;
+
+    for (const token of pattern.tokens) {
+      totalLength += token.length;
+      longestTokenLength = Math.max(longestTokenLength, token.length);
+    }
+
+    return { pattern, totalLength, longestTokenLength, };
+  });
+
+  scoredPatterns.sort((left, right) => {
+    return right.totalLength - left.totalLength
+      || right.longestTokenLength - left.longestTokenLength
+      || right.pattern.tokens.length - left.pattern.tokens.length
+      || left.pattern.entryId - right.pattern.entryId
+      || left.pattern.order - right.pattern.order;
+  });
+
+  patterns = scoredPatterns.map(item => item.pattern);
 
   const pool = new StringPool();
   const exactRows = [...exactMap.entries()]
