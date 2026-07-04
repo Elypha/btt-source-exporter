@@ -24,6 +24,10 @@ export function arraysEqual(left, right) {
 }
 export function normaliseRenderedText(text) {
   return normaliseRenderedFragment(text)
+    // alphabetic writing systems have dynamic line breaks added at runtime
+    // character-based languages (ja, zh) doesn't have the issue
+    .replace(/\n/g, " ")
+    .replace(/[ \t]+/g, " ")
     .trim();
 }
 
