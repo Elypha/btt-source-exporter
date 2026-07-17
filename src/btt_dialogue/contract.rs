@@ -1,15 +1,3 @@
-// source scope defaults
-// --------------------------------
-pub(super) const DEFAULT_TALK_SHEET: &str = "DefaultTalk";
-pub(super) const DEFAULT_TALK_TEXT_COLUMNS: [&str; 3] = ["Text[0]", "Text[1]", "Text[2]"];
-
-pub(super) const DEFAULT_SOURCE_SCOPES: [SourceScope; 4] = [
-    SourceScope::Sheet(DEFAULT_TALK_SHEET),
-    SourceScope::Folder("custom"),
-    SourceScope::Folder("quest"),
-    SourceScope::Folder("cut_scene"),
-];
-
 // source bundle manifest
 // --------------------------------
 pub(super) const SOURCE_BUNDLE_FORMAT: &str = "btt-dialogue-source-bundle";
@@ -39,29 +27,6 @@ pub(super) const IR_IF: u8 = 6;
 pub(super) const IR_SWITCH: u8 = 7;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum SourceScope {
-    Sheet(&'static str),
-    Folder(&'static str),
-}
-
-impl SourceScope {
-    pub(super) fn manifest_name(self) -> &'static str {
-        match self {
-            Self::Sheet(name) | Self::Folder(name) => name,
-        }
-    }
-
-    pub(super) fn matches(self, sheet_name: &str) -> bool {
-        match self {
-            Self::Sheet(name) => sheet_name == name,
-            Self::Folder(name) => sheet_name
-                .strip_prefix(name)
-                .is_some_and(|suffix| suffix.starts_with('/')),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ScopeMode {
     DefaultScopes,
     ExplicitSheets,
@@ -72,16 +37,6 @@ impl ScopeMode {
         match self {
             Self::DefaultScopes => "default-scopes",
             Self::ExplicitSheets => "explicit-sheets",
-        }
-    }
-
-    pub(super) fn source_scope_names(self) -> Vec<&'static str> {
-        match self {
-            Self::DefaultScopes => DEFAULT_SOURCE_SCOPES
-                .iter()
-                .map(|scope| scope.manifest_name())
-                .collect(),
-            Self::ExplicitSheets => Vec::new(),
         }
     }
 }

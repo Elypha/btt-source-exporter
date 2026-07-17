@@ -1,3 +1,5 @@
+import { readDialogueSourceModel } from "./source-model.mjs";
+
 // release layout
 // --------------------------------
 export const releaseManifestFileName = "latest.json";
@@ -16,7 +18,7 @@ export const sourceBundleKind = "dialogue-source";
 export const sourceStructurePath = "structure.bttbin";
 export const sourceDialoguePath = "dialogue.bttbin";
 export const sourceBundleFiles = ["manifest.json", sourceStructurePath, sourceDialoguePath];
-export const sourceScopes = ["DefaultTalk", "custom", "quest", "cut_scene"];
+export const sourceScopes = readDialogueSourceModel().sourceScopes;
 export const dialogueIrEncodingVersion = 2;
 
 // binary shard contract

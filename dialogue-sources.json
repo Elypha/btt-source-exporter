@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "kind": "standaloneTalk",
+      "sheet": "DefaultTalk",
+      "textColumns": ["Text[0]", "Text[1]", "Text[2]"]
+    },
+    {
+      "kind": "standaloneTalk",
+      "sheet": "GoldSaucerTalk",
+      "textColumns": ["Message"]
+    },
+    {
+      "kind": "eventFolder",
+      "folder": "custom"
+    },
+    {
+      "kind": "eventFolder",
+      "folder": "quest"
+    },
+    {
+      "kind": "eventFolder",
+      "folder": "cut_scene"
+    }
+  ]
+}

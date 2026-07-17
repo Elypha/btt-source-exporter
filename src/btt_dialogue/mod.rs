@@ -15,6 +15,7 @@ mod language;
 mod package;
 mod shards;
 mod source_extraction;
+mod source_model;
 
 use contract::ScopeMode;
 use package::{
@@ -23,6 +24,7 @@ use package::{
 };
 use shards::SourceBundleBuilder;
 use source_extraction::{export_sheet, select_sheets};
+use source_model::SourceModel;
 
 #[derive(Debug)]
 pub struct Options {
@@ -82,6 +84,8 @@ pub fn export(options: Options) -> Result<(), Box<dyn Error>> {
     }
 
     let mut excel = Excel::new(ironworks);
+    let source_model = SourceModel::load_default()?;
+    let source_scopes = source_model.source_scope_names();
     let game_version = read_game_version(&game_path).unwrap_or_else(|| "unknown".to_string());
     let scope_mode = if options.sheets.is_some() {
         ScopeMode::ExplicitSheets
@@ -95,11 +99,11 @@ pub fn export(options: Options) -> Result<(), Box<dyn Error>> {
     for language in languages {
         excel.set_default_language(language.ironworks());
         let language_code = language.code();
-        let sheets = select_sheets(&excel, options.sheets.as_deref())?;
+        let sheets = select_sheets(&excel, &source_model, options.sheets.as_deref())?;
         let mut bundle = SourceBundleBuilder::new();
 
         for sheet_name in &sheets {
-            export_sheet(&excel, sheet_name, &mut bundle).map_err(|error| {
+            export_sheet(&excel, sheet_name, &source_model, &mut bundle).map_err(|error| {
                 format!(
                     "Failed to export BTT dialogue sheet {sheet_name} for {language_code}: {error}"
                 )
@@ -111,6 +115,7 @@ pub fn export(options: Options) -> Result<(), Box<dyn Error>> {
             language_code,
             &game_version,
             scope_mode,
+            &source_scopes,
             &sheets,
             bundle,
         )?;

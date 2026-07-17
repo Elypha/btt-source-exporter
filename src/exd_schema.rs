@@ -1,7 +1,8 @@
+use include_dir::{Dir, include_dir};
 use serde::Deserialize;
-use serde_yml;
 use std::error::Error;
-use std::fs::File;
+
+static SCHEMAS: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/schemas");
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,14 +44,13 @@ impl Default for FieldKind {
 /// Retrieve a list of field names from EXDSchema for the given sheet.
 /// Returns None if no schema file exists.
 pub fn field_names(sheet_name: &str) -> Result<Option<Vec<String>>, Box<dyn Error>> {
-    let path = format!("schemas/{}.yml", sheet_name);
-    let file = match File::open(&path) {
-        Ok(file) => file,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(_) => return Err(format!("Could not read schema file: {path}").into()),
+    let path = format!("schemas/{sheet_name}.yml");
+    let file = match SCHEMAS.get_file(format!("{sheet_name}.yml")) {
+        Some(file) => file,
+        None => return Ok(None),
     };
 
-    let schema: Schema = match serde_yml::from_reader(file) {
+    let schema: Schema = match serde_yml::from_slice(file.contents()) {
         Ok(schema) => schema,
         Err(_) => return Err(format!("Failed to parse schema: {path}").into()),
     };
@@ -61,21 +61,21 @@ pub fn field_names(sheet_name: &str) -> Result<Option<Vec<String>>, Box<dyn Erro
         None => parse_field_names(&schema.fields),
     };
 
-    return Ok(Some(names));
+    Ok(Some(names))
 }
 
-fn parse_field_names(fields: &Vec<Field>) -> Vec<String> {
+fn parse_field_names(fields: &[Field]) -> Vec<String> {
     let mut names: Vec<String> = Vec::new();
 
     // Add the ID field
     names.push(String::from("#"));
 
-    for field in fields.iter() {
-        let name = latest_name(&field);
+    for field in fields {
+        let name = latest_name(field);
 
         match field.kind {
             FieldKind::Array => {
-                parse_array(&field, name, &mut names);
+                parse_array(field, name, &mut names);
             }
             _ => {
                 names.push(name);
@@ -83,18 +83,18 @@ fn parse_field_names(fields: &Vec<Field>) -> Vec<String> {
         }
     }
 
-    return names;
+    names
 }
 
 // Prefer the pending field name when available
 fn latest_name(field: &Field) -> String {
-    return match &field.pending_name {
+    match &field.pending_name {
         Some(pending) => pending.clone(),
         None => field
             .name
             .clone()
             .expect("Schema must provide a name for all fields."),
-    };
+    }
 }
 
 fn parse_array(field: &Field, name: String, names: &mut Vec<String>) {
@@ -102,7 +102,7 @@ fn parse_array(field: &Field, name: String, names: &mut Vec<String>) {
         Some(count) => {
             for i in 0..*count {
                 // Append an index to the given name
-                let name = format!("{}[{}]", name, i);
+                let name = format!("{name}[{i}]");
 
                 match &field.fields {
                     Some(fields) => {
@@ -111,7 +111,7 @@ fn parse_array(field: &Field, name: String, names: &mut Vec<String>) {
                             for field in fields {
                                 // Technically we should re-check the field kind, but only arrays are countable at the moment
                                 parse_array(
-                                    &field,
+                                    field,
                                     format!("{}.{}", name, latest_name(field)),
                                     names,
                                 );

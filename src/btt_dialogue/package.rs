@@ -29,6 +29,7 @@ pub(super) fn write_source_bundle(
     language: &str,
     game_version: &str,
     scope_mode: ScopeMode,
+    source_scopes: &[String],
     sheets: &[String],
     bundle: SourceBundleBuilder,
 ) -> Result<BundleSummary, Box<dyn Error>> {
@@ -50,7 +51,10 @@ pub(super) fn write_source_bundle(
         dialogue_schema_version: u32::from(DIALOGUE_SCHEMA_VERSION),
         dialogue_ir_encoding_version: DIALOGUE_IR_ENCODING_VERSION,
         scope_mode: scope_mode.as_str(),
-        source_scopes: scope_mode.source_scope_names(),
+        source_scopes: match scope_mode {
+            ScopeMode::DefaultScopes => source_scopes.to_vec(),
+            ScopeMode::ExplicitSheets => Vec::new(),
+        },
         sheets: sheets.to_vec(),
         sheet_count: sheets.len(),
         structure_records,
@@ -97,7 +101,7 @@ struct SourceBundleManifest<'a> {
     #[serde(rename = "scopeMode")]
     scope_mode: &'a str,
     #[serde(rename = "sourceScopes")]
-    source_scopes: Vec<&'a str>,
+    source_scopes: Vec<String>,
     sheets: Vec<String>,
     #[serde(rename = "sheetCount")]
     sheet_count: usize,

@@ -8,15 +8,16 @@ use ironworks::{
 
 use crate::exd_schema::field_names;
 
-use super::contract::{DEFAULT_SOURCE_SCOPES, DEFAULT_TALK_SHEET, DEFAULT_TALK_TEXT_COLUMNS};
 use super::shards::{
     DialogueRecordRef, SourceBundleBuilder, SourceRecordIdentityRef, StructureRecordRef,
 };
+use super::source_model::SourceModel;
 
 // sheet selection
 // --------------------------------
 pub(super) fn select_sheets(
     excel: &Excel,
+    source_model: &SourceModel,
     requested: Option<&[String]>,
 ) -> Result<Vec<String>, Box<dyn Error>> {
     if let Some(requested) = requested {
@@ -28,11 +29,7 @@ pub(super) fn select_sheets(
         .iter()
         .map(|sheet| sheet.to_string())
         .collect::<Vec<_>>();
-    sheets.retain(|sheet| {
-        DEFAULT_SOURCE_SCOPES
-            .iter()
-            .any(|scope| scope.matches(sheet))
-    });
+    sheets.retain(|sheet| source_model.matches_default_scope(sheet));
     sheets.sort();
     Ok(sheets)
 }
@@ -42,6 +39,7 @@ pub(super) fn select_sheets(
 pub(super) fn export_sheet(
     excel: &Excel,
     sheet_name: &str,
+    source_model: &SourceModel,
     bundle: &mut SourceBundleBuilder,
 ) -> Result<(), Box<dyn Error>> {
     let sheet = excel.sheet(sheet_name)?;
@@ -75,12 +73,12 @@ pub(super) fn export_sheet(
             fields.push((name, field));
         }
 
-        if sheet_name == DEFAULT_TALK_SHEET {
-            export_default_talk_row(bundle, sheet_name, &row_id, &fields)?;
+        if let Some(text_columns) = source_model.standalone_talk_text_columns(sheet_name) {
+            export_standalone_talk_row(bundle, sheet_name, &row_id, &fields, text_columns)?;
             continue;
         }
 
-        if is_dialogue_event_sheet(sheet_name) {
+        if source_model.is_event_dialogue_sheet(sheet_name) {
             export_event_dialogue_row(bundle, sheet_name, &row_id, &fields)?;
         }
     }
@@ -88,22 +86,23 @@ pub(super) fn export_sheet(
     Ok(())
 }
 
-fn export_default_talk_row(
+fn export_standalone_talk_row(
     bundle: &mut SourceBundleBuilder,
     sheet_name: &str,
     row_id: &str,
     fields: &[(String, Field)],
+    text_columns: &[String],
 ) -> Result<(), Box<dyn Error>> {
-    for column in DEFAULT_TALK_TEXT_COLUMNS {
+    for column in text_columns {
         let field = require_named_field(fields, column, sheet_name, row_id)?;
         let Field::String(value) = field else {
             return Err(format!(
-                "Expected DefaultTalk field to be a string: {sheet_name}:{row_id}:{column}"
+                "Expected standalone talk field to be a string: {sheet_name}:{row_id}:{column}"
             )
             .into());
         };
 
-        let key = format!("{DEFAULT_TALK_SHEET}_{row_id}_{column}");
+        let key = format!("{sheet_name}_{row_id}_{column}");
         push_source_text(bundle, sheet_name, row_id, column, &key, value.as_ref())?;
     }
 
@@ -158,12 +157,6 @@ fn export_event_dialogue_row(
         &key,
         text_field.as_ref(),
     )
-}
-
-fn is_dialogue_event_sheet(sheet_name: &str) -> bool {
-    DEFAULT_SOURCE_SCOPES
-        .iter()
-        .any(|scope| scope.matches(sheet_name))
 }
 
 // source identity helpers
