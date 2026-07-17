@@ -63,3 +63,10 @@ npm --prefix builder run build -- `
 ```powershell
 cargo run -- "<install-root-containing-game>" --languages ja --sheets DefaultTalk
 ```
+
+**Distribution:** To build a standalone static Windows executable:
+
+```powershell
+cargo build --release
+# binary: target\release\btt-source-exporter.exe
+```
